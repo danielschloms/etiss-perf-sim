@@ -5,6 +5,7 @@ import os
 import pathlib
 import sys
 import time
+import shutil
 
 # Read input arguments
 argParser = argparse.ArgumentParser()
@@ -16,8 +17,10 @@ argParser.add_argument("-tp", "--trace_performance", help="Path to dump traces g
 argParser.add_argument("-ta", "--trace_asm", help="Path to dump ASM-trace")
 argParser.add_argument("-ti", "--trace_instr", help="Path to dump instruction-trace")
 argParser.add_argument("-gdb", "--debug", action="store_true", help="Run in ETISS-debug mode")
+argParser.add_argument("-gdbh", "--debug_host", action="store_true", help="Run ETISS with GDB host")
 argParser.add_argument("-tgdb", "--target_debug", help="Run in target-SW-debug mode with specified debuger (<YOUR_PATH>/bin/riscv<32|64>-unknown-elf-gdb)")
 argParser.add_argument("-p", "--profile", action="store_true", help="Run in profile mode (valgrind)")
+argParser.add_argument("-dp", "--dyn_path", help="Specify a path for dynamic .ini files")
 args = argParser.parse_args()
 
 # Check input arguments
@@ -26,6 +29,7 @@ if args.core is None:
 
 # Resolve simulation dir and targetSW
 simDir = str(pathlib.Path(__file__).resolve().parent) + "/simulator"
+dynDir = pathlib.Path(simDir)
 targetSW = str(pathlib.Path(args.targetSW).resolve())
 
 # # Resolve debugger path
@@ -37,7 +41,10 @@ targetSW = str(pathlib.Path(args.targetSW).resolve())
 #         debugger += "/bin/riscv64-unknown-elf-gdb"
 
 # Creating a dynamic ini file for run specific configurations
-dynIni = pathlib.Path(simDir + "/dyn.ini").resolve()
+if args.dyn_path:
+    dynDir = pathlib.Path(args.dyn_path).resolve()
+    
+dynIni = pathlib.Path(dynDir / "dyn.ini").resolve()
 with dynIni.open('w') as f:
     # Specify target-SW
     f.write("[StringConfigurations]\n")
@@ -45,18 +52,18 @@ with dynIni.open('w') as f:
     if args.bootrom is not None:
         f.write("vp.boot_file=" + str(pathlib.Path(args.bootrom).resolve()))
     # Specify debug-plugin
-    if args.target_debug is not None:
+    if args.debug_host:
         f.write("[Plugin gdbserver]\n")
         f.write("plugin.gdbserver.port=2222\n")
 
 # Create plugin ini file
 # TODO: Configuring the plugins here is not ideal! Find alternative!
-pluginIni = pathlib.Path(simDir + "/plugin.ini").resolve()
+pluginIni = pathlib.Path(dynDir / "plugin.ini").resolve()
 with pluginIni.open('w') as f:
     # Specify PerformanceEstimatorPlugin
     if not args.no_performance:
         f.write("[Plugin PerformanceEstimatorPlugin]\n")
-        f.write("plugin.perfEst.uArch=" + args.core.upper() + "\n")
+        f.write("plugin.perfEst.uArch=" + args.core + "\n")
         if (perfTrace:=args.trace_performance) is not None:
             f.write("plugin.perfEst.print=1\n")
             f.write("plugin.perfEst.printDir=" + str(pathlib.Path(perfTrace).resolve()) + "\n")
@@ -79,6 +86,10 @@ with pluginIni.open('w') as f:
         f.write("plugin.tracePrinter.stream.outDir=" + str(pathlib.Path(instrTrace).resolve()) + "\n")
         f.write("plugin.tracePrinter.stream.fileName=instr_trace\n")
         f.write("plugin.tracePrinter.stream.rotateSize=0x100000\n")
+
+if args.dyn_path:
+    shutil.copy(dynIni, pathlib.Path(simDir) / "dyn.ini")
+    shutil.copy(pluginIni, pathlib.Path(simDir) / "plugin.ini")
         
 # Set exe and args pathes
 vp_exe = simDir + "/build/main"
@@ -86,6 +97,7 @@ vp_args = " -i" + simDir + "/ini/common.ini"
 vp_args += " -i" + simDir + "/ini/" + args.core + ".ini"
 vp_args += " -i" + str(dynIni)
 vp_args += " -i" + str(pluginIni)
+vp_args += " -i" + simDir + "/ini/AddressLayout.ini"
 run_sim = vp_exe + vp_args
 
 # Run simulation
@@ -104,5 +116,5 @@ else:
     print("Total execution time: " + str(float(endTime - startTime)) + "s")
 
 # Remove dynamic ini file
-os.system("rm " + str(dynIni))
-os.system("rm " + str(pluginIni))
+# os.system("rm " + str(dynIni))
+# os.system("rm " + str(pluginIni))
