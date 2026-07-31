@@ -15,9 +15,9 @@ if [ ! -L SoftwareEvalLib ]; then
     ln -s ${EPS_ETISS_PLUGINS}/SoftwareEvalLib SoftwareEvalLib
 fi
 
-echo " > Applying hot-fixes to ETISS"
-cp ${EPS_ETISS_HOTFIX}/include/etiss/* ${EPS_ETISS}/include/etiss
-cp ${EPS_ETISS_HOTFIX}/src/* ${EPS_ETISS}/src
+# echo " > Applying hot-fixes to ETISS"
+# cp ${EPS_ETISS_HOTFIX}/include/etiss/* ${EPS_ETISS}/include/etiss
+# cp ${EPS_ETISS_HOTFIX}/src/* ${EPS_ETISS}/src
 
 echo " > Installing..."
 mkdir -p ${EPS_ETISS_BUILD}
